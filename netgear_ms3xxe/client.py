@@ -3,6 +3,8 @@ from .auth import AuthManager
 from .router import Router
 from .domains.ports import PortsAPI
 from .domains.access_control import AccessControlAPI
+from .domains.system import SystemAPI
+
 
 
 class NetgearSwitchClient:
@@ -15,3 +17,5 @@ class NetgearSwitchClient:
 
         self.ports = PortsAPI(self.router)
         self.access_control = AccessControlAPI(self.router)
+
+        self.system = SystemAPI(self.router)

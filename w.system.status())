@@ -1,0 +1,84 @@
+[1mdiff --git a/netgear_ms3xxe.pyproj b/netgear_ms3xxe.pyproj[m
+[1mindex 6fabdb0..bc2b3a9 100644[m
+[1m--- a/netgear_ms3xxe.pyproj[m
+[1m+++ b/netgear_ms3xxe.pyproj[m
+[36m@@ -23,6 +23,7 @@[m
+   <ItemGroup>[m
+     <Compile Include="netgear_ms3xxe\auth.py" />[m
+     <Compile Include="netgear_ms3xxe\client.py" />[m
+[32m+[m[32m    <Compile Include="netgear_ms3xxe\domains\system.py" />[m
+     <Compile Include="netgear_ms3xxe\endpoints.py" />[m
+     <Compile Include="netgear_ms3xxe\exceptions.py" />[m
+     <Compile Include="netgear_ms3xxe\domains\access_control.py" />[m
+[1mdiff --git a/netgear_ms3xxe/client.py b/netgear_ms3xxe/client.py[m
+[1mindex a7ae722..e3762ce 100644[m
+[1m--- a/netgear_ms3xxe/client.py[m
+[1m+++ b/netgear_ms3xxe/client.py[m
+[36m@@ -3,6 +3,8 @@[m [mfrom .auth import AuthManager[m
+ from .router import Router[m
+ from .domains.ports import PortsAPI[m
+ from .domains.access_control import AccessControlAPI[m
+[32m+[m[32mfrom .domains.system import SystemAPI[m
+[32m+[m
+ [m
+ [m
+ class NetgearSwitchClient:[m
+[36m@@ -15,3 +17,5 @@[m [mclass NetgearSwitchClient:[m
+ [m
+         self.ports = PortsAPI(self.router)[m
+         self.access_control = AccessControlAPI(self.router)[m
+[32m+[m
+[32m+[m[32m        self.system = SystemAPI(self.router)[m
+[1mdiff --git a/tests/smoke.py b/tests/smoke.py[m
+[1mindex c709927..1df1ef5 100644[m
+[1m--- a/tests/smoke.py[m
+[1m+++ b/tests/smoke.py[m
+[36m@@ -6,3 +6,6 @@[m [mfor p in sw.ports.get():[m
+     print(p)[m
+ [m
+ print(sw.access_control.get())[m
+[32m+[m
+[32m+[m[32mprint(sw.system.status())[m
+[32m+[m[32mprint(sw.system.ip_settings())[m
+[1mdiff --git a/netgear_ms3xxe.pyproj b/netgear_ms3xxe.pyproj[m
+[1mindex 6fabdb0..bc2b3a9 100644[m
+[1m--- a/netgear_ms3xxe.pyproj[m
+[1m+++ b/netgear_ms3xxe.pyproj[m
+[36m@@ -23,6 +23,7 @@[m
+   <ItemGroup>[m
+     <Compile Include="netgear_ms3xxe\auth.py" />[m
+     <Compile Include="netgear_ms3xxe\client.py" />[m
+[32m+[m[32m    <Compile Include="netgear_ms3xxe\domains\system.py" />[m
+     <Compile Include="netgear_ms3xxe\endpoints.py" />[m
+     <Compile Include="netgear_ms3xxe\exceptions.py" />[m
+     <Compile Include="netgear_ms3xxe\domains\access_control.py" />[m
+[1mdiff --git a/netgear_ms3xxe/client.py b/netgear_ms3xxe/client.py[m
+[1mindex a7ae722..e3762ce 100644[m
+[1m--- a/netgear_ms3xxe/client.py[m
+[1m+++ b/netgear_ms3xxe/client.py[m
+[36m@@ -3,6 +3,8 @@[m [mfrom .auth import AuthManager[m
+ from .router import Router[m
+ from .domains.ports import PortsAPI[m
+ from .domains.access_control import AccessControlAPI[m
+[32m+[m[32mfrom .domains.system import SystemAPI[m
+[32m+[m
+ [m
+ [m
+ class NetgearSwitchClient:[m
+[36m@@ -15,3 +17,5 @@[m [mclass NetgearSwitchClient:[m
+ [m
+         self.ports = PortsAPI(self.router)[m
+         self.access_control = AccessControlAPI(self.router)[m
+[32m+[m
+[32m+[m[32m        self.system = SystemAPI(self.router)[m
+[1mdiff --git a/tests/smoke.py b/tests/smoke.py[m
+[1mindex c709927..1df1ef5 100644[m
+[1m--- a/tests/smoke.py[m
+[1m+++ b/tests/smoke.py[m
+[36m@@ -6,3 +6,6 @@[m [mfor p in sw.ports.get():[m
+     print(p)[m
+ [m
+ print(sw.access_control.get())[m
+[32m+[m
+[32m+[m[32mprint(sw.system.status())[m
+[32m+[m[32mprint(sw.system.ip_settings())[m

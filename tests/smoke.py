@@ -6,3 +6,6 @@ for p in sw.ports.get():
     print(p)
 
 print(sw.access_control.get())
+
+print(sw.system.status())
+print(sw.system.ip_settings())

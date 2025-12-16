@@ -23,6 +23,7 @@
   <ItemGroup>
     <Compile Include="netgear_ms3xxe\auth.py" />
     <Compile Include="netgear_ms3xxe\client.py" />
+    <Compile Include="netgear_ms3xxe\domains\system.py" />
     <Compile Include="netgear_ms3xxe\endpoints.py" />
     <Compile Include="netgear_ms3xxe\exceptions.py" />
     <Compile Include="netgear_ms3xxe\domains\access_control.py" />
