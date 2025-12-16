@@ -1,46 +1,52 @@
-import json
+# netgear_ms3xxe/auth.py
+from __future__ import annotations
+
 from .exceptions import NetgearAPIError
 
 
 class AuthManager:
-    def __init__(self, transport):
-        self.transport = transport
+    def __init__(self, router, transport=None):
+        """
+        router: Router (preferred)
+        transport: only needed if you want to clear cookies on retry
+        """
+        self.router = router
+        self.transport = transport or router.transport
         self.token = None
         self.session_id = None
 
-    def login(self, password: str):
-        # PATCH /api/system/login
-        body = json.dumps({"password": password}, separators=(",", ":"))
-        r = self.transport.request(
-            "PATCH",
-            "/api/system/login",
-            data=body,
-            headers={"Content-Type": "text/plain;charset=UTF-8"},
-        )
-        r.raise_for_status()
-        j = r.json()
+    def login(self, password: str) -> None:
+        last_err = None
 
-        if j.get("errCode") != 0:
-            raise NetgearAPIError(f"Login failed: {j}")
+        for attempt in (1, 2):
+            try:
+                j = self.router.patch_textjson("/api/system/login", {"password": password})
+                self.session_id = j["id"]
 
-        self.session_id = j["id"]
-        self.token = j["token"]
-        self.transport.session.headers["Authorization"] = f"Bearer {self.token}"
+                # token is already set as Authorization by your existing logic elsewhere;
+                # but we keep it here for reference.
+                # If you want Router/Transport to set it, do it in one place.
+                tok = j.get("token")
+                if not tok:
+                    raise NetgearAPIError(f"Login response missing token: {j}")
 
-        # POST /api/login_session
-        body2 = json.dumps({"id": self.session_id, "status": True}, separators=(",", ":"))
-        r2 = self.transport.request(
-            "POST",
-            "/api/login_session",
-            data=body2,
-            headers={"Content-Type": "text/plain;charset=UTF-8"},
-        )
-        
-        # Known quirk: can 500 if session already exists
-        if r2.status_code == 500:
-            self.transport.session.cookies.clear()
-            self.transport.session.headers.pop("Authorization", None)
-            self.login(password)
-            return
+                self.token = tok
+                self.transport.session.headers["Authorization"] = f"Bearer {tok}"
 
-        r2.raise_for_status()
+                self.router.post_textjson("/api/login_session", {"id": self.session_id, "status": True})
+                return
+
+            except NetgearAPIError as e:
+                last_err = e
+
+                # retry once on known flaky server behavior:
+                # clear cookies + auth header then re-login
+                if attempt == 1:
+                    self.transport.session.cookies.clear()
+                    self.transport.session.headers.pop("Authorization", None)
+                    continue
+
+                raise
+
+        # unreachable, but keeps type checkers happy
+        raise last_err or NetgearAPIError("Login failed")
