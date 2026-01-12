@@ -20,12 +20,9 @@ class AuthManager:
 
         for attempt in (1, 2):
             try:
-                j = self.router.patch_textjson("/api/system/login", {"password": password})
+                j = self.router.call("auth.login", {"password": password})
                 self.session_id = j["id"]
 
-                # token is already set as Authorization by your existing logic elsewhere;
-                # but we keep it here for reference.
-                # If you want Router/Transport to set it, do it in one place.
                 tok = j.get("token")
                 if not tok:
                     raise NetgearAPIError(f"Login response missing token: {j}")
@@ -33,14 +30,12 @@ class AuthManager:
                 self.token = tok
                 self.transport.session.headers["Authorization"] = f"Bearer {tok}"
 
-                self.router.post_textjson("/api/login_session", {"id": self.session_id, "status": True})
+                self.router.call("auth.login_session", {"id": self.session_id, "status": True})
                 return
 
             except NetgearAPIError as e:
                 last_err = e
 
-                # retry once on known flaky server behavior:
-                # clear cookies + auth header then re-login
                 if attempt == 1:
                     self.transport.session.cookies.clear()
                     self.transport.session.headers.pop("Authorization", None)
@@ -48,5 +43,4 @@ class AuthManager:
 
                 raise
 
-        # unreachable, but keeps type checkers happy
         raise last_err or NetgearAPIError("Login failed")

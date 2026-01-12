@@ -4,13 +4,16 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>0705d7e2-d95f-4eb6-a131-8043b67b4b23</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>tests\smoke.py</StartupFile>
+    <StartupFile>
+    </StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>netgear_ms3xxe</Name>
     <RootNamespace>netgear_ms3xxe</RootNamespace>
+    <IsWindowsApplication>False</IsWindowsApplication>
+    <InterpreterId>Global|PythonCore|3.11</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -22,28 +25,65 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="netgear_ms3xxe\auth.py" />
+    <Compile Include="netgear_ms3xxe\backends\base.py" />
+    <Compile Include="netgear_ms3xxe\backends\ms3xxe_react.py" />
+    <Compile Include="netgear_ms3xxe\backends\registry.py" />
     <Compile Include="netgear_ms3xxe\client.py" />
+    <Compile Include="netgear_ms3xxe\domains\lag.py" />
+    <Compile Include="netgear_ms3xxe\domains\multicast.py" />
+    <Compile Include="netgear_ms3xxe\domains\power.py" />
     <Compile Include="netgear_ms3xxe\domains\system.py" />
+    <Compile Include="netgear_ms3xxe\domains\vlan.py" />
     <Compile Include="netgear_ms3xxe\endpoints.py" />
     <Compile Include="netgear_ms3xxe\exceptions.py" />
     <Compile Include="netgear_ms3xxe\domains\access_control.py" />
     <Compile Include="netgear_ms3xxe\domains\ports.py" />
     <Compile Include="netgear_ms3xxe\domains\__init__.py" />
     <Compile Include="netgear_ms3xxe\models\access_control.py" />
+    <Compile Include="netgear_ms3xxe\models\ip_settings.py" />
+    <Compile Include="netgear_ms3xxe\models\lag.py" />
+    <Compile Include="netgear_ms3xxe\models\multicast.py" />
     <Compile Include="netgear_ms3xxe\models\ports.py" />
+    <Compile Include="netgear_ms3xxe\models\port_led.py" />
+    <Compile Include="netgear_ms3xxe\models\port_pvid.py" />
+    <Compile Include="netgear_ms3xxe\models\port_ratelimit.py" />
+    <Compile Include="netgear_ms3xxe\models\port_statistics.py" />
+    <Compile Include="netgear_ms3xxe\models\port_stormcontrol.py" />
+    <Compile Include="netgear_ms3xxe\models\power_led.py" />
+    <Compile Include="netgear_ms3xxe\models\qos_broadcast.py" />
+    <Compile Include="netgear_ms3xxe\models\qos_mode.py" />
+    <Compile Include="netgear_ms3xxe\models\qos_ports.py" />
+    <Compile Include="netgear_ms3xxe\models\system_status.py" />
+    <Compile Include="netgear_ms3xxe\models\vlan.py" />
     <Compile Include="netgear_ms3xxe\models\__init__.py" />
     <Compile Include="netgear_ms3xxe\profiles\base.py" />
+    <Compile Include="netgear_ms3xxe\profiles\ms305e.py" />
     <Compile Include="netgear_ms3xxe\profiles\ms308e.py" />
+    <Compile Include="netgear_ms3xxe\profiles\registry.py" />
+    <Compile Include="netgear_ms3xxe\profiles\__init__.py" />
     <Compile Include="netgear_ms3xxe\router.py" />
-    <Compile Include="tests\smoke.py" />
     <Compile Include="netgear_ms3xxe\transport.py" />
+    <Compile Include="tests\conftest.py" />
+    <Compile Include="tests\test_endpoints_aliases.py" />
+    <Compile Include="tests\test_endpoints_coverage.py" />
+    <Compile Include="tests\test_smoke.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="netgear_ms3xxe\" />
     <Folder Include="netgear_ms3xxe\domains\" />
     <Folder Include="netgear_ms3xxe\models\" />
+    <Folder Include="netgear_ms3xxe\backends\" />
     <Folder Include="netgear_ms3xxe\profiles\" />
     <Folder Include="tests\" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="Global|PythonCore|3.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include=".editorconfig" />
+    <Content Include=".gptignore" />
+    <Content Include="pyproject.toml" />
+    <Content Include="pytest.ini" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

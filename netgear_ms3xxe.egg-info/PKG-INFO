@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: netgear-ms3xxe
+Version: 0.0.0
+Summary: Python client for NETGEAR Plus / Easy Smart MS3xxE switches
+Requires-Python: >=3.11
+License-File: LICENSE.txt
+Requires-Dist: requests>=2.31
+Provides-Extra: dev
+Requires-Dist: pytest>=9.0; extra == "dev"
+Dynamic: license-file

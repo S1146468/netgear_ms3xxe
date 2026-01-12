@@ -1,104 +1,125 @@
-# netgear_ms3xxe/router.py
-from __future__ import annotations
-
 import json
-from typing import Any, Dict, Optional
-
+from dataclasses import dataclass
+from typing import Any, Dict
+from .endpoints import ENDPOINTS, ALIASES
 from .exceptions import NetgearAPIError
+
+
+@dataclass(frozen=True)
+class RequestContext:
+    method: str
+    path: str
+    status: int
+    content_type: str
+    snippet: str
 
 
 class Router:
     """
-    Single choke-point for API semantics:
-      - correct encoding (plain-text JSON string vs normal JSON)
-      - consistent JSON parsing
-      - consistent errCode handling
-      - clear errors when the switch returns HTML or non-JSON
+    Router owns request encoding/decoding + errors + request tracking.
+
+    Critical: calls are tracked by endpoint_id (not raw path) so tests can detect drift.
     """
 
-    def __init__(self, transport, auth=None):
+    def __init__(self, transport):
         self.transport = transport
-        self.auth = auth  # optional (future: ensure_login / refresh)
+        self.calls: list[str] = []  # endpoint_id call trace
 
-    # ---------- public helpers ----------
 
+
+    def call(self, endpoint_id: str, payload: Any | None = None) -> Dict[str, Any]:
+        # Resolve aliases to canonical IDs
+        endpoint_id = ALIASES.get(endpoint_id, endpoint_id)
+
+        spec = ENDPOINTS.get(endpoint_id)
+        if spec is None:
+            raise NetgearAPIError(f"Unknown endpoint_id: {endpoint_id!r}")
+
+        # Support both legacy tuple specs and the newer EndpointSpec dataclass.
+        if hasattr(spec, "method") and hasattr(spec, "path") and hasattr(spec, "kind"):
+            method = spec.method
+            path = spec.path
+            kind = spec.kind
+        else:
+            # legacy: ("GET", "/api/...", "json")
+            method, path, kind = spec
+
+        self.calls.append(endpoint_id)  # track canonical IDs
+
+        if kind == "json":
+            return self._request_json(method, path, kind="json")
+        if kind == "textjson":
+            return self._request_json(method, path, kind="textjson", text_json_body=payload)
+
+        raise NetgearAPIError(f"Unsupported endpoint kind {kind!r} for endpoint_id {endpoint_id!r}")
+
+
+    # Hard guardrails: prevent domains from sneaking raw paths back in.
     def get(self, path: str) -> Dict[str, Any]:
-        return self._request_json("GET", path)
+        raise NetgearAPIError("Router.get(path) is not allowed. Use Router.call(endpoint_id).")
 
     def post_textjson(self, path: str, obj: Any | None) -> Dict[str, Any]:
-        """
-        Sends body as a JSON string with Content-Type: text/plain;charset=UTF-8.
-        Use this for endpoints like /api/login_session on MS308E family.
-        """
-        return self._request_json("POST", path, text_json_body=obj)
+        raise NetgearAPIError("Router.post_textjson(path, ...) is not allowed. Use Router.call(endpoint_id, payload).")
 
     def patch_textjson(self, path: str, obj: Any | None) -> Dict[str, Any]:
-        """
-        Sends body as a JSON string with Content-Type: text/plain;charset=UTF-8.
-        Use this for endpoints like /api/system/login on MS308E family.
-        """
-        return self._request_json("PATCH", path, text_json_body=obj)
+        raise NetgearAPIError("Router.patch_textjson(path, ...) is not allowed. Use Router.call(endpoint_id, payload).")
 
     def post_json(self, path: str, obj: Any | None) -> Dict[str, Any]:
-        """Normal JSON body (application/json). Only use if confirmed by HAR."""
-        return self._request_json("POST", path, json_body=obj)
+        raise NetgearAPIError("Router.post_json(path, ...) is not allowed. Use Router.call(endpoint_id, payload).")
 
     def patch_json(self, path: str, obj: Any | None) -> Dict[str, Any]:
-        """Normal JSON body (application/json). Only use if confirmed by HAR."""
-        return self._request_json("PATCH", path, json_body=obj)
-
-    # ---------- core request/parse ----------
+        raise NetgearAPIError("Router.patch_json(path, ...) is not allowed. Use Router.call(endpoint_id, payload).")
 
     def _request_json(
         self,
         method: str,
         path: str,
         *,
+        kind: str,
         text_json_body: Any | None = None,
         json_body: Any | None = None,
     ) -> Dict[str, Any]:
-        headers: Dict[str, str] = {}
-        data: Optional[str] = None
-
         if text_json_body is not None and json_body is not None:
             raise ValueError("Provide only one of text_json_body or json_body")
 
+        headers: Dict[str, str] = {}
+        kwargs: Dict[str, Any] = {}
+
         if text_json_body is not None:
             headers["Content-Type"] = "text/plain;charset=UTF-8"
-            data = json.dumps(text_json_body, separators=(",", ":"))
+            kwargs["data"] = json.dumps(text_json_body, separators=(",", ":"))
         elif json_body is not None:
-            headers["Content-Type"] = "application/json"
-            data = json.dumps(json_body, separators=(",", ":"))
+            kwargs["json"] = json_body
 
-        r = self.transport.request(method, path, headers=headers or None, data=data)
+        r = self.transport.request(method, path, headers=headers or None, **kwargs)
 
-        # If you want “retry once on 401”, add it here later.
+        ctype = (r.headers.get("content-type") or "").lower()
+        snippet = (r.text or "")[:300].replace("\n", " ")
+        ctx = RequestContext(method, path, r.status_code, ctype, snippet)
+
         if r.status_code == 401:
-            raise NetgearAPIError("Unauthorized (401)")
+            raise NetgearAPIError(f"Unauthorized (401) for {method} {path}")
 
-        # 4xx/5xx -> raise with context
         try:
             r.raise_for_status()
         except Exception as e:
-            snippet = (r.text or "")[:300].replace("\n", " ")
-            raise NetgearAPIError(f"HTTP {r.status_code} for {method} {path}: {snippet}") from e
+            raise NetgearAPIError(f"HTTP {ctx.status} for {ctx.method} {ctx.path}: {ctx.snippet}") from e
 
-        # Guard: API should return JSON; HTML means wrong route / SPA fallback.
-        ctype = (r.headers.get("content-type") or "").lower()
-        if "application/json" not in ctype:
-            snippet = (r.text or "")[:300].replace("\n", " ")
+        # Detect SPA / HTML fallback early (common when auth/session breaks)
+        if "text/html" in ctx.content_type or ctx.snippet.lstrip().lower().startswith(("<!doctype html", "<html")):
             raise NetgearAPIError(
-                f"Non-JSON response for {method} {path} (content-type={ctype}): {snippet}"
+                f"HTML/SPA fallback for {ctx.method} {ctx.path} "
+                f"(ctype={ctx.content_type}): {ctx.snippet}"
             )
 
         try:
             j = r.json()
         except Exception as e:
-            snippet = (r.text or "")[:300].replace("\n", " ")
-            raise NetgearAPIError(f"Invalid JSON for {method} {path}: {snippet}") from e
+            raise NetgearAPIError(
+                f"Invalid JSON for {ctx.method} {ctx.path} (ctype={ctx.content_type}): {ctx.snippet}"
+            ) from e
 
-        # NETGEAR-style error envelope
         if isinstance(j, dict) and "errCode" in j and j["errCode"] not in (0, None):
-            raise NetgearAPIError(f"API error for {method} {path}: {j}")
+            raise NetgearAPIError(f"API error for {ctx.method} {ctx.path}: {j}")
 
         return j

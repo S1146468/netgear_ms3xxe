@@ -6,5 +6,8 @@ class AccessControlAPI:
         self.router = router
 
     def get(self):
-        j = self.router.get("/api/system/settings/accesscontrol")
-        return [AccessRuleIP(ip=r["ipAddr"], mask=r["mask"]) for r in j["accessConfs"]]
+        j = self.router.call("access.get")
+        rules = [AccessRuleIP(ip=r["ipAddr"], mask=r["mask"]) for r in j["accessConfs"]]
+        for rule in rules:
+            rule.validate()
+        return rules
