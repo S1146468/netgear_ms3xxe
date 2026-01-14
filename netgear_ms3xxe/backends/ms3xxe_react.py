@@ -35,6 +35,14 @@ class Ms3xxeReactBackend:
         auth = AuthManager(router, transport)
         auth.login(password)
 
+        def _relogin() -> None:
+            # Make refresh deterministic: clear cookies + auth header, then login again.
+            transport.session.cookies.clear()
+            transport.session.headers.pop("Authorization", None)
+            auth.login(password)
+
+        router.set_on_unauthorized(_relogin)
+
         domains: Dict[str, Any] = {
             "system": SystemAPI(router),
             "ports": PortsAPI(router),

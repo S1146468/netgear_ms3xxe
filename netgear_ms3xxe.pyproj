@@ -63,10 +63,14 @@
     <Compile Include="netgear_ms3xxe\profiles\__init__.py" />
     <Compile Include="netgear_ms3xxe\router.py" />
     <Compile Include="netgear_ms3xxe\transport.py" />
+    <Compile Include="netgear_ms3xxe\typing_contracts.py" />
+    <Compile Include="netgear_ms3xxe\__init__.py" />
     <Compile Include="tests\conftest.py" />
     <Compile Include="tests\test_endpoints_aliases.py" />
     <Compile Include="tests\test_endpoints_coverage.py" />
+    <Compile Include="tests\test_router_unauthorized_retry.py" />
     <Compile Include="tests\test_smoke.py" />
+    <Compile Include="tests\test_transport_retry.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="netgear_ms3xxe\" />

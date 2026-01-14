@@ -12,4 +12,8 @@ def _live_config():
 @pytest.fixture(scope="session")
 def live_client():
     host, password = _live_config()
-    return NetgearSwitchClient(host, password)
+    client = NetgearSwitchClient(host, password)
+    try:
+        yield client
+    finally:
+        client.close()

@@ -106,3 +106,16 @@ class NetgearSwitchClient:
         else None.
         """
         return self._initial_status
+
+
+    def close(self) -> None:
+        """Release underlying HTTP resources (requests.Session)."""
+        session = getattr(self.transport, "session", None)
+        if session is not None:
+            session.close()
+
+    def __enter__(self) -> "NetgearSwitchClient":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()

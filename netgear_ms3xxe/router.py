@@ -1,7 +1,8 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Dict
-from .endpoints import ENDPOINTS, ALIASES
+from typing import Any, Callable, Dict
+
+from .endpoints import ALIASES, ENDPOINTS
 from .exceptions import NetgearAPIError
 
 
@@ -25,7 +26,12 @@ class Router:
         self.transport = transport
         self.calls: list[str] = []  # endpoint_id call trace
 
+        self._on_unauthorized: Callable[[], None] | None = None
+        self._in_unauthorized_handler: bool = False
 
+    def set_on_unauthorized(self, handler: Callable[[], None] | None) -> None:
+        """Set a callback invoked once on 401 to refresh auth/session."""
+        self._on_unauthorized = handler
 
     def call(self, endpoint_id: str, payload: Any | None = None) -> Dict[str, Any]:
         # Resolve aliases to canonical IDs
@@ -47,12 +53,12 @@ class Router:
         self.calls.append(endpoint_id)  # track canonical IDs
 
         if kind == "json":
-            return self._request_json(method, path, kind="json")
+            # allow payload for future endpoints; harmless for current GETs
+            return self._request_json(endpoint_id, method, path, kind="json", json_body=payload)
         if kind == "textjson":
-            return self._request_json(method, path, kind="textjson", text_json_body=payload)
+            return self._request_json(endpoint_id, method, path, kind="textjson", text_json_body=payload)
 
         raise NetgearAPIError(f"Unsupported endpoint kind {kind!r} for endpoint_id {endpoint_id!r}")
-
 
     # Hard guardrails: prevent domains from sneaking raw paths back in.
     def get(self, path: str) -> Dict[str, Any]:
@@ -72,12 +78,14 @@ class Router:
 
     def _request_json(
         self,
+        endpoint_id: str,
         method: str,
         path: str,
         *,
         kind: str,
         text_json_body: Any | None = None,
         json_body: Any | None = None,
+        _retried_after_401: bool = False,
     ) -> Dict[str, Any]:
         if text_json_body is not None and json_body is not None:
             raise ValueError("Provide only one of text_json_body or json_body")
@@ -91,24 +99,53 @@ class Router:
         elif json_body is not None:
             kwargs["json"] = json_body
 
-        r = self.transport.request(method, path, headers=headers or None, **kwargs)
+        try:
+            r = self.transport.request(method, path, headers=headers or None, **kwargs)
+        except Exception as e:
+            raise NetgearAPIError(f"Transport error for {endpoint_id} ({method} {path}): {e!r}") from e
 
         ctype = (r.headers.get("content-type") or "").lower()
         snippet = (r.text or "")[:300].replace("\n", " ")
         ctx = RequestContext(method, path, r.status_code, ctype, snippet)
 
+        # 401 => one re-login attempt + single retry (but NEVER recurse on auth endpoints)
         if r.status_code == 401:
-            raise NetgearAPIError(f"Unauthorized (401) for {method} {path}")
+            can_refresh = (
+                self._on_unauthorized is not None
+                and not _retried_after_401
+                and not self._in_unauthorized_handler
+                and not endpoint_id.startswith("auth.")
+            )
+            if can_refresh:
+                self._in_unauthorized_handler = True
+                try:
+                    self._on_unauthorized()
+                finally:
+                    self._in_unauthorized_handler = False
+
+                return self._request_json(
+                    endpoint_id,
+                    method,
+                    path,
+                    kind=kind,
+                    text_json_body=text_json_body,
+                    json_body=json_body,
+                    _retried_after_401=True,
+                )
+
+            raise NetgearAPIError(f"Unauthorized (401) for {endpoint_id} ({ctx.method} {ctx.path})")
 
         try:
             r.raise_for_status()
         except Exception as e:
-            raise NetgearAPIError(f"HTTP {ctx.status} for {ctx.method} {ctx.path}: {ctx.snippet}") from e
+            raise NetgearAPIError(
+                f"HTTP {ctx.status} for {endpoint_id} ({ctx.method} {ctx.path}): {ctx.snippet}"
+            ) from e
 
         # Detect SPA / HTML fallback early (common when auth/session breaks)
         if "text/html" in ctx.content_type or ctx.snippet.lstrip().lower().startswith(("<!doctype html", "<html")):
             raise NetgearAPIError(
-                f"HTML/SPA fallback for {ctx.method} {ctx.path} "
+                f"HTML/SPA fallback for {endpoint_id} ({ctx.method} {ctx.path}) "
                 f"(ctype={ctx.content_type}): {ctx.snippet}"
             )
 
@@ -116,10 +153,11 @@ class Router:
             j = r.json()
         except Exception as e:
             raise NetgearAPIError(
-                f"Invalid JSON for {ctx.method} {ctx.path} (ctype={ctx.content_type}): {ctx.snippet}"
+                f"Invalid JSON for {endpoint_id} ({ctx.method} {ctx.path}) "
+                f"(ctype={ctx.content_type}): {ctx.snippet}"
             ) from e
 
         if isinstance(j, dict) and "errCode" in j and j["errCode"] not in (0, None):
-            raise NetgearAPIError(f"API error for {ctx.method} {ctx.path}: {j}")
+            raise NetgearAPIError(f"API error for {endpoint_id} ({ctx.method} {ctx.path}): {j}")
 
         return j
