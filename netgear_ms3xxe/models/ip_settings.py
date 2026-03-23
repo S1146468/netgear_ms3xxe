@@ -11,7 +11,7 @@ class IPConfs:
     dns1_ip: str
     dns2_ip: str
 
-    def validate(self) -> None:
+    def validate(self) -> None: 
         if self.configuration not in ("static", "dhcp"):
             # don't assume more modes than observed/typical
             raise ValueError(f"Unknown IP configuration mode: {self.configuration}")
